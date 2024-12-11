@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net.Mail;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -26,7 +27,7 @@ namespace Server.Service
             _logger.LogInformation("Generated SQL Query: {SqlQuery}", sqlQuery);
 
             int pageNumber = 1;  // Start from the first page
-            int recordsPerPage = 4;  // Records per page
+            int recordsPerPage = 50;  // Records per page
             int startRecordNumber = 1;  // Start from the first record
 
             List<User> allUsers = new List<User>();
@@ -36,13 +37,15 @@ namespace Server.Service
                 var payload = new
                 {
                     id = 0,
-                    
                     pageNumber = pageNumber,
                     previewSql = sqlQuery,
                     recordsPerPage = recordsPerPage,
                     startRecordNumber = startRecordNumber,
                     useDatabasePaging = true,
-                    useDefaultParameters = true
+                    useDefaultParameters = true,
+                    encodeHtml = true,
+
+
                 };
 
                 _logger.LogInformation("Starting API call for page {PageNumber}...", pageNumber);
@@ -57,40 +60,30 @@ namespace Server.Service
                 }
 
                 allUsers.AddRange(users);
-                  
-                // Prepare for the next page
+
                 pageNumber++;
-                startRecordNumber += recordsPerPage;  // Adjust for the next page's starting record
+                startRecordNumber += recordsPerPage;
                 Console.WriteLine($"count it: {allUsers.Count}");
 
             }
-            Console.WriteLine("the response we got is: {allUsers.Count}" );
+            Console.WriteLine("the response we got is: {allUsers.Count}");
             return allUsers;
         }
 
 
 
-
-
         private string BuildSqlQuery(List<ScimFilterCondition> conditions)
         {
-            var sqlQuery = "SELECT UserId, UserName,DisplayName,Password,Created,Enabled,EmailAddress,LastModifiedDate ,overall_count = COUNT(1) OVER() FROM dbo.tbUser WHERE 1=1";
+            //var sqlQuery = "SELECT UserId,Password,Created,Enabled,LastModifiedDate FROM dbo.tbUser WHERE 1=1";
+            var sqlQuery = "SELECT UserId,Password,Created,Enabled,LastModifiedDate,EmailAddress,UserName,DisplayName FROM dbo.tbUser WHERE 1=1";
 
             foreach (var condition in conditions)
             {
-                sqlQuery += $" AND {BuildCondition(condition)}";
+                sqlQuery += " AND " + BuildCondition(condition);
             }
-
-            // Calculate starting record based on page number and records per page
-            //int startRecord = (pageNumber - 1) * recordsPerPage;
-
-            //// Add pagination and return the query
-            //sqlQuery += $" ORDER BY UserId OFFSET {startRecord} ROWS FETCH NEXT {recordsPerPage} ROWS ONLY";
 
             return sqlQuery;
         }
-
-
 
 
         private string BuildCondition(ScimFilterCondition condition)
@@ -178,7 +171,7 @@ namespace Server.Service
 
                 // Deserialize the response into ApiResponse
                 var response = JsonSerializer.Deserialize<ApiResponse>(rawResponse, options);
-                Console.WriteLine("The response we got is: " + rawResponse);
+                //Console.WriteLine("The response we got is: " + rawResponse);
 
                 if (response?.Rows == null || response.Rows.Count == 0)
                 {
@@ -190,14 +183,32 @@ namespace Server.Service
                 var users = new List<User>();
                 foreach (var row in response.Rows)
                 {
-                    var user = new User
+                    if (row.Count > 0) // Ensure there is data in the row
                     {
-                        // Use the TryGetValue helper method for safe conversion
-                        UserId = DataConversionHelper.TryGetValue<int>(row[0], _logger),      // Convert to int (UserId)
-                        UserName = DataConversionHelper.TryGetValue<string>(row[1], _logger)   // Convert to string (UserName)
-                    };
-                    users.Add(user);
+                        var user = new User
+                        {
+                            //UserId = row.Count > 0 ? DataConversionHelper.TryGetValue<int>(row[0], _logger) : 0,
+                            //EmailAddress = row.Count > 1 ? DataConversionHelper.TryGetValue<string>(row[1], _logger) : null,
+                            UserId = row.Count > 0 ? DataConversionHelper.TryGetValue<int>(row[0], _logger) : 0,
+
+                            Password = row.Count > 1 ? DataConversionHelper.TryGetValue<string>(row[1], _logger) : null,
+                            Created = row.Count > 2 ? DataConversionHelper.TryGetValue<DateTime>(row[2], _logger) : DateTime.MinValue,
+                            Enabled = row.Count > 3 ? DataConversionHelper.TryGetValue<bool>(row[3], _logger) : false,
+                           
+                            LastModifiedDate = row.Count > 4 ? DataConversionHelper.TryGetValue<DateTime>(row[4], _logger) : DateTime.MinValue,
+                            EmailAddress = row.Count > 5 ? DataConversionHelper.TryGetValue<string>(row[5], _logger) : null,
+                            UserName = row.Count > 6 ? DataConversionHelper.TryGetValue<string>(row[6], _logger) : null,
+                            DisplayName = row.Count > 7 ? DataConversionHelper.TryGetValue<string>(row[7], _logger) : null,
+
+                        };
+                        users.Add(user);
+                    }
+                    else
+                    {
+                        _logger.LogWarning("Row has no elements: {Row}", row);
+                    }
                 }
+
                 Console.WriteLine(users.Count);
                 return users;
             }

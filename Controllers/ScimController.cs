@@ -10,28 +10,29 @@ namespace Server.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    public class UsersController : ControllerBase
+    public class ScimController : ControllerBase
     {
         private readonly UserService _userService;
         private readonly TokenService _tokenService;
 
-        public UsersController(UserService userService, TokenService tokenService)
+        public ScimController(UserService userService, TokenService tokenService)
         {
             _userService = userService;
             _tokenService = tokenService;
         }
 
         [HttpGet]
-        public async Task<ActionResult<List<User>>> GetUsers([FromQuery] string scimFilter)
+        public async Task<ActionResult<List<User>>> GetUsers([FromQuery] string? scimFilter = null)
         {
-            if (string.IsNullOrEmpty(scimFilter))
-            {
-                return BadRequest("SCIM filter query is required.");
-            }
-
             try
             {
-                var filterConditions = ParseScimFilter(scimFilter);
+                List<ScimFilterCondition> filterConditions = new();
+
+                // If the SCIM filter is provided, parse it
+                if (!string.IsNullOrEmpty(scimFilter))
+                {
+                    filterConditions = ParseScimFilter(scimFilter);
+                }
 
                 string apiUrl = "https://scimtest.secretservercloud.com/api/v1/reports/execute";
 
@@ -40,14 +41,15 @@ namespace Server.Controllers
                     "abhi",
                     "Abhi@12345"
                 );
-                Console.WriteLine( "we Have token as "+ token );
+                Console.WriteLine("We have token as: " + token);
+
+                // Call the user service with or without filter conditions
                 var users = await _userService.GetUsersByFilterConditionsAndCallApi(filterConditions, apiUrl, token);
 
                 if (users == null || users.Count == 0)
                 {
                     return NotFound("No users found matching the filter.");
                 }
-                Console.WriteLine("USES are {users}");
 
                 return Ok(users);
             }
@@ -60,6 +62,7 @@ namespace Server.Controllers
                 return StatusCode(500, $"Internal server error: {ex.Message}");
             }
         }
+
 
         private List<ScimFilterCondition> ParseScimFilter(string scimFilter)
         {
@@ -82,11 +85,6 @@ namespace Server.Controllers
                     Operator = op,
                     Value = match.Groups[4].Value
                 });
-            }
-
-            if (conditions.Count == 0)
-            {
-                throw new ArgumentException("Invalid SCIM filter query format.");
             }
 
             return conditions;

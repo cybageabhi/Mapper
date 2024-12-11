@@ -20,6 +20,15 @@ namespace Server.Helpers
 
                     if (typeof(T) == typeof(DateTime) && jsonElement.TryGetDateTime(out var dateTimeValue))
                         return (T)(object)dateTimeValue;
+
+                    if (typeof(T) == typeof(bool) && jsonElement.ValueKind == JsonValueKind.True || jsonElement.ValueKind == JsonValueKind.False)
+                        return (T)(object)jsonElement.GetBoolean();
+
+                    if (jsonElement.ValueKind == JsonValueKind.Null)
+                    {
+                        return default;
+                    }
+
                 }
                 else if (value is T validValue)
                 {
@@ -33,5 +42,6 @@ namespace Server.Helpers
 
             return default;
         }
+
     }
 }

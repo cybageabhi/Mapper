@@ -11,8 +11,5 @@
         public bool Enabled { get; set; }
         public string EmailAddress { get; set; }
         public DateTime LastModifiedDate { get; set; }
-        //    public int UserId { get; set; }
-        //public string UserName { get; set; }
-        public int OverallCount { get; set; }
     }
 }

@@ -24,6 +24,8 @@ namespace Server.Service
             {
                 var jsonBody = JsonSerializer.Serialize(payload);
                 var httpContent = new StringContent(jsonBody, Encoding.UTF8, "application/json");
+                httpContent.Headers.ContentType.CharSet = "utf-8";
+
                 _logger.LogInformation("Sending request to {ApiUrl} with payload: {Payload}", apiUrl, jsonBody);
 
                 _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
@@ -36,7 +38,24 @@ namespace Server.Service
                     return null;
                 }
 
-                var rawResponse = string.Empty;
+                // Step 1: Print the raw response content before reading it as a string
+                try
+                {
+                    // Read the raw response content as a stream and log it
+                    var rawContent = await response.Content.ReadAsStreamAsync();
+                    using (var reader = new StreamReader(rawContent))
+                    {
+                        string rawResponseAsString = await reader.ReadToEndAsync();
+                        _logger.LogInformation("Raw Response Content: {RawResponse}", rawResponseAsString);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError("Error reading raw response content: {Error}", ex.Message);
+                }
+
+                // Step 2: Now read the response as a string
+                string rawResponse = string.Empty;
                 try
                 {
                     rawResponse = await response.Content.ReadAsStringAsync();
@@ -62,6 +81,8 @@ namespace Server.Service
                 throw;
             }
         }
+
+
 
     }
 }
